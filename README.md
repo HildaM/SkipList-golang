@@ -1,4 +1,4 @@
-## SkipList KV 存储引擎
+# 基于SkipList的KV存储引擎
 
 ### 简介
 本项目基于 [SkipList-CPP](https://github.com/youngyangyang04/Skiplist-CPP) ，使用 Golang 重写。是学习golang的练手项目。
