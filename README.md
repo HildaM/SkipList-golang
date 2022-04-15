@@ -16,3 +16,8 @@ SkipList-golang是基于跳表实现的轻量级键值型存储引擎，使用go
 - Size（返回数据规模）
 
 
+### 遇到的问题
+1. 泛型细节问题
+   current.Forward[i].GetKey() < key 语句，即使泛型都正确，但是依然显示current的key与K的类型不同？
+
+
