@@ -30,9 +30,6 @@ type SkipList struct {
 	// 头节点指针
 	header *Node
 
-	// 文件操作
-	// TODO
-
 	// 当前跳表的节点数
 	element_count int
 }
@@ -47,10 +44,10 @@ type SkipList struct {
 		SearchElement()：搜索指定节点				√
 		DeleteElement()：删除指定节点				√
 		DumpFile()：持久化数据					√
-		LoadFile()：加载本地存储数据
+		LoadFile()：加载本地存储数据				√
 		Size()：获取跳表长度						√
 
-		TestInfo()：测试函数，获取内部信息
+		TestInfo()：测试函数，获取内部信息			√
 
 	私有方法：
 		1. getKeyValueFromString()：从字符串中获取KV（？？？） // TODO
