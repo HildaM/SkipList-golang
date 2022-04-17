@@ -1,9 +1,11 @@
 package core
 
 import (
+	"bufio"
 	"fmt"
 	"math/rand"
-	"reflect"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -11,6 +13,13 @@ import (
 /*
 	SkipList：跳表的具体实现
 */
+
+var (
+	lock      sync.Mutex
+	delimiter string = ":"
+	// STORE_FILE string = "E:\\Program Practics\\SkipList-golang\\store\\dumpFile.txt"  // 此路径仅用来保存压力测试的结果
+	STORE_FILE string = "store/dumpFile.txt"
+)
 
 // SkipList Define
 type SkipList struct {
@@ -37,9 +46,11 @@ type SkipList struct {
 		DisplayList()：查看所有节点				√
 		SearchElement()：搜索指定节点				√
 		DeleteElement()：删除指定节点				√
-		DumpFile()：持久化数据
+		DumpFile()：持久化数据					√
 		LoadFile()：加载本地存储数据
-		Size()：获取跳表长度
+		Size()：获取跳表长度						√
+
+		TestInfo()：测试函数，获取内部信息
 
 	私有方法：
 		1. getKeyValueFromString()：从字符串中获取KV（？？？） // TODO
@@ -69,14 +80,9 @@ func (sklipList *SkipList) CreateNode(k string, v any, level int) *Node {
 // return 1: 元素存在		return 0: 元素插入成功
 func (skipList *SkipList) InsertElement(key string, value any) int {
 	maxLevel := skipList.max_level
-	listLevel := skipList.skip_list_level
 
 	// 上锁
-	lock := sync.Mutex{}
 	lock.Lock()
-
-	//key = reflect.ValueOf(key)
-	value = reflect.ValueOf(value)
 
 	current := skipList.header
 
@@ -91,7 +97,7 @@ func (skipList *SkipList) InsertElement(key string, value any) int {
 		1. 从头节点的最顶层开始遍历
 		2. 一直到最接近key的最底层
 	*/
-	for i := listLevel; i >= 0; i-- {
+	for i := skipList.skip_list_level; i >= 0; i-- {
 		for current.Forward[i] != nil && current.Forward[i].GetKey() < key {
 			current = current.Forward[i]
 		}
@@ -118,8 +124,8 @@ func (skipList *SkipList) InsertElement(key string, value any) int {
 		randomLevel := skipList.GetRandomLevel()
 
 		// 如果生成的层数超过当前最高层数的话，说明索引层数需要增高，此时增高的索引第一个元素就是header
-		if randomLevel > listLevel {
-			for i := listLevel + 1; i < randomLevel+1; i++ {
+		if randomLevel > skipList.skip_list_level {
+			for i := skipList.skip_list_level + 1; i < randomLevel+1; i++ {
 				update[i] = skipList.header
 			}
 			// 这里需要更新原值
@@ -198,7 +204,7 @@ func (skipList *SkipList) DisplayList() {
 	//fmt.Printf("There are %d keys in total\n", skipList.element_count)
 
 	fmt.Println("********************* SkipList Structure *********************")
-	for i := 0; i <= skipList.skip_list_level; i++ {
+	for i := skipList.skip_list_level; i >= 0; i-- {
 		cur := skipList.header.Forward[i]
 		fmt.Printf("Level %d : ", i)
 		for cur != nil {
@@ -211,7 +217,6 @@ func (skipList *SkipList) DisplayList() {
 
 // DeleteElement 删除指定元素
 func (skipList *SkipList) DeleteElement(k string) {
-	lock := sync.Mutex{}
 	lock.Lock()
 
 	current := skipList.header
@@ -252,4 +257,64 @@ func (skipList *SkipList) DeleteElement(k string) {
 // Size
 func (skipList *SkipList) Size() int {
 	return skipList.element_count
+}
+
+// 测试相关
+func (skipList *SkipList) TestInfo() {
+	fmt.Printf("生成 %d 元素，索引层数为 %d，最大的索引层数为 %d\n", skipList.element_count, skipList.skip_list_level, skipList.max_level)
+}
+
+// DumpFile 持久化数据
+func (skipList *SkipList) DumpFile() {
+	fmt.Println("保存数据中........................")
+
+	file, err := os.OpenFile(STORE_FILE, os.O_RDWR, 0666)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("读取文件失败")
+		return
+	}
+	defer file.Close()
+
+	node := skipList.header.Forward[0]
+
+	for node != nil {
+		value := fmt.Sprintf("%v", node.GetValue())
+		_, err := file.WriteString(node.GetKey() + ":" + value + "\n") // _: writeString
+		if err != nil {
+			return
+		}
+		// fmt.Printf("写入了：%d 字节内容\n", writeString)
+		node = node.Forward[0]
+	}
+
+	fmt.Println("保存数据成功........................")
+	return
+}
+
+// LoadFile
+func (skipList *SkipList) LoadFile() {
+	fmt.Println("读取数据中........................")
+
+	file, err := os.OpenFile(STORE_FILE, os.O_RDWR, 0666)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("读取文件失败")
+		return
+	}
+	defer file.Close()
+
+	// Scanner
+	buf := bufio.NewScanner(file)
+	for {
+		if !buf.Scan() {
+			break
+		}
+		line := buf.Text() // 读取一行
+		// line = strings.TrimSpace(line)	// 移除多余的空格
+		strSlice := strings.Split(line, delimiter)
+
+		skipList.InsertElement(strSlice[0], strSlice[1])
+		fmt.Printf("key: %v; value: %v", strSlice[0], strSlice[1])
+	}
 }
