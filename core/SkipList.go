@@ -2,8 +2,10 @@ package core
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sync"
+	"time"
 )
 
 /*
@@ -28,13 +30,13 @@ type SkipList struct {
 
 /*
 	公共方法：
-		Init(): 初始化变量方法
-		GetRandomLevel()：随机指定节点的索引层数
-		CreateNode()：创建节点
-		InsertElement()：插入节点
-		DisplayList()：查看所有节点
-		SearchElement()：搜索指定节点
-		DeleteElement()：删除指定节点
+		Init(): 初始化变量方法						√
+		GetRandomLevel()：随机指定节点的索引层数		√
+		CreateNode()：创建节点					√
+		InsertElement()：插入节点					√
+		DisplayList()：查看所有节点				√
+		SearchElement()：搜索指定节点				√
+		DeleteElement()：删除指定节点				√
 		DumpFile()：持久化数据
 		LoadFile()：加载本地存储数据
 		Size()：获取跳表长度
@@ -44,6 +46,17 @@ type SkipList struct {
 		2. isValidString()：检查字符串是否合法（？？？） // TODO
 
 */
+
+// Init
+func (skipList *SkipList) Init(maxLevel int) {
+	skipList.max_level = maxLevel
+	skipList.skip_list_level = 0
+	skipList.element_count = 0
+
+	// 创建头节点
+	skipList.header = new(Node)
+	skipList.header.Init("", 0, maxLevel)
+}
 
 // CreateNode
 func (sklipList *SkipList) CreateNode(k string, v any, level int) *Node {
@@ -104,7 +117,7 @@ func (skipList *SkipList) InsertElement(key string, value any) int {
 		// 随机生成索引层数
 		randomLevel := skipList.GetRandomLevel()
 
-		// 如果生成的层数超过当前最高层数的话，那么剩下的空间就用header填充，并且更新当前层数
+		// 如果生成的层数超过当前最高层数的话，说明索引层数需要增高，此时增高的索引第一个元素就是header
 		if randomLevel > listLevel {
 			for i := listLevel + 1; i < randomLevel+1; i++ {
 				update[i] = skipList.header
@@ -121,7 +134,7 @@ func (skipList *SkipList) InsertElement(key string, value any) int {
 			insertNode.Forward[i] = update[i].Forward[i]
 			update[i].Forward[i] = insertNode
 		}
-		fmt.Printf("Successfully inserted key: %s", key)
+		fmt.Printf("Successfully inserted key: %s\n", key)
 		skipList.element_count++
 	}
 
@@ -146,15 +159,97 @@ func (skipList *SkipList) SearchElement(key string) bool {
 	current = current.Forward[0]
 
 	if current != nil && current.GetKey() == key {
-		fmt.Printf("Found key: %s, value: %d", current.GetKey(), current.GetValue())
+		fmt.Printf("Found key: %s, value: %v\n", current.GetKey(), current.GetValue())
 		return true
 	}
 
-	fmt.Printf("Not found key: %s", key)
+	fmt.Printf("Not found key: %s\n", key)
 	return false
 }
 
 // GetRandomLevel
 func (skipList *SkipList) GetRandomLevel() int {
-	return 0
+	rand.Seed(time.Now().UnixNano()) // 随机数种子
+
+	k := 1
+	for (rand.Int() % 2) != 0 {
+		k++
+	}
+
+	// golang不支持三元运算符
+	if k < skipList.max_level {
+		return k
+	} else {
+		return skipList.max_level
+	}
+}
+
+// DisplayList 展现整个跳表的结构，包括索引
+func (skipList *SkipList) DisplayList() {
+	// 一开始还以为只需要展示元数据呢。。。
+	//currrent := skipList.header
+	//
+	//// 开始遍历
+	//for currrent.Forward[0] != nil {
+	//	fmt.Printf("key: %s, value: %d\n", currrent.GetKey(), currrent.GetValue())
+	//	currrent = currrent.Forward[0]
+	//}
+	//
+	//fmt.Printf("There are %d keys in total\n", skipList.element_count)
+
+	fmt.Println("********************* SkipList Structure *********************")
+	for i := 0; i <= skipList.skip_list_level; i++ {
+		cur := skipList.header.Forward[i]
+		fmt.Printf("Level %d : ", i)
+		for cur != nil {
+			fmt.Printf("(%s : %v) ---> ", cur.GetKey(), cur.GetValue())
+			cur = cur.Forward[i]
+		}
+		fmt.Println()
+	}
+}
+
+// DeleteElement 删除指定元素
+func (skipList *SkipList) DeleteElement(k string) {
+	lock := sync.Mutex{}
+	lock.Lock()
+
+	current := skipList.header
+	update := make([]*Node, skipList.max_level+1)
+
+	// 从顶层开始寻找
+	for i := skipList.skip_list_level; i >= 0; i-- {
+		for current.Forward[i] != nil && current.Forward[i].GetKey() < k {
+			current = current.Forward[i]
+		}
+		update[i] = current
+	}
+
+	current = current.Forward[0]
+	if current != nil && current.GetKey() == k {
+		// 从最底层开始删除节点
+		for i := 0; i <= skipList.skip_list_level; i++ {
+			// 当下一个节点不是指定节点时
+			if update[i].Forward[i] != current {
+				break
+			}
+			update[i].Forward[i] = current.Forward[i]
+		}
+
+		// 删除没有节点的索引层
+		for skipList.skip_list_level > 0 && skipList.header.Forward[skipList.skip_list_level] == nil {
+			skipList.skip_list_level--
+		}
+
+		skipList.element_count--
+		fmt.Printf("Successfully deleted key: %s\n", k)
+	}
+
+	lock.Unlock()
+	return
+}
+
+// Size
+func (skipList *SkipList) Size() int {
+	return skipList.element_count
 }
